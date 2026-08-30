@@ -4,3 +4,4 @@ __pycache__/
 uv.lock
 .planning/
 .doc-graph/
+bin/slq

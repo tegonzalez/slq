@@ -26,16 +26,13 @@ doc-graph: "When there is an intention to amend this document, first Adhere to [
 
 `slq` requires Python 3.13+ and [uv](https://docs.astral.sh/uv/).
 
-### Run from source (no install)
+### Run from source
+
+Create a host-owned virtual environment (do not share `.venv` across Linux and macOS):
 
 ```bash
+uv sync
 uv run slq --help
-```
-
-A launcher is also available at `bin/slq`:
-
-```bash
-./bin/slq --help
 ```
 
 ### Run the test suite
