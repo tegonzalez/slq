@@ -115,7 +115,7 @@ slq ':time/2026-08-29/:kind:role'
 
 ## Commands
 
-`slq` uses subcommands. Because FBR expressions always start with `:` or `/`, the `query` subcommand is optional.
+`slq` uses subcommands. Because FBR expressions start with `:`, `/`, `(`, `!`, or `not`, the `query` subcommand is optional.
 
 ```bash
 slq query :k/user/ /count/   # explicit

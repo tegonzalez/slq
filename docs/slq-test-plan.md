@@ -73,6 +73,13 @@ Define how `slq` is verified before acceptance.
 - Admitted paths collapse a symlink and its target to one filesystem object.
 - `available()` and `can_answer()` are false when no path is admitted.
 
+### CLI Boundaries
+
+- An invalid `--since` or `--until` value exits 2, names the rejected value, and emits no traceback.
+- Closing the stdout pipe while output is streaming exits 0 without a shutdown-time `BrokenPipeError`.
+- Context selection is exercised through the extracted `with_context()` seam without changing its observable records.
+- Default source registration is owned by `sources.registry`, so adding an adapter does not add imports to `cli.py`.
+
 ## Source Adapter Tests
 
 - `codex` source emits `Record`s for a sample rollout file and builds a session row when requested.

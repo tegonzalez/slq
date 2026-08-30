@@ -5,8 +5,8 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, TextIO
 
+from .context import with_context
 from .cursor import Cursor
-from .eval import evaluate
 from .output import render_records
 from .query import ParseError, extract_output_fields, parse
 from .schema import (
@@ -16,14 +16,12 @@ from .schema import (
     UnknownFieldError,
     resolve_field,
 )
-from .sources.claude import ClaudeSource
-from .sources.codex import CodexSource
-from .sources.devin import DevinSource
+from .sources.registry import DEFAULT_SOURCES
 from .stats import stats
 from .workqueue import get_workqueue
 
 
-SOURCES = [CodexSource(), ClaudeSource(), DevinSource()]
+SOURCES = DEFAULT_SOURCES
 
 
 def _init_workqueue() -> None:
@@ -100,6 +98,9 @@ def main(argv: Optional[List[str]] = None, out: TextIO = sys.stdout, err: TextIO
         except (OSError, ValueError):
             pass
         return 0
+    except argparse.ArgumentTypeError as exc:
+        err.write(f"slq: {exc}\n")
+        return 2
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else 2
         return code
@@ -202,7 +203,7 @@ def _run_query(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
 
     records = _collect_records(ast, env={"since": since, "until": until})
     if args.context > 0:
-        records = _with_context(records, ast, args.context)
+        records = with_context(records, ast, args.context)
         cursor = Cursor(records, since=since, until=until, limit=args.limit, fields=fields)
     else:
         cursor = Cursor(records, ast=ast, since=since, until=until, limit=args.limit, fields=fields)
@@ -283,49 +284,6 @@ def _collect_records(ast: Any, env: Optional[Dict[str, Any]] = None) -> Iterable
             for record in source.records(ast, env):
                 yield record
     return gen()
-
-
-def _with_context(records: Iterable[Record], ast: Any, n: int) -> Iterator[Record]:
-    base = 0
-    buf: List[Record] = []
-    matches: List[int] = []
-    emitted: set = set()
-    for idx, record in enumerate(records):
-        record.meta["_match"] = bool(evaluate(record, ast))
-        buf.append(record)
-        if record.meta["_match"]:
-            matches.append(idx)
-        while matches and (idx - matches[0]) >= n:
-            m = matches.pop(0)
-            for j in range(m - n, m + n + 1):
-                if j in emitted:
-                    continue
-                bj = j - base
-                if 0 <= bj < len(buf):
-                    emitted.add(j)
-                    r = buf[bj]
-                    r.meta["context"] = "match" if j == m else "context"
-                    yield r
-            trim_to = (matches[0] - n) if matches else (m + n + 1)
-            trim_to = max(trim_to - base, 0)
-            if trim_to > 0:
-                del buf[:trim_to]
-                base += trim_to
-        if not matches:
-            keep = len(buf) - n
-            if keep > 0:
-                del buf[:keep]
-                base += keep
-    for m in matches:
-        for j in range(m - n, m + n + 1):
-            if j in emitted:
-                continue
-            bj = j - base
-            if 0 <= bj < len(buf):
-                emitted.add(j)
-                r = buf[bj]
-                r.meta["context"] = "match" if j == m else "context"
-                yield r
 
 
 def _parse_fields(text: Optional[str]) -> Optional[List[str]]:

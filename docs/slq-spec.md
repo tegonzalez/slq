@@ -15,7 +15,7 @@ Specify the consumer-visible behavior of the `slq` command, the FBR query langua
 | Surface    | Syntax                                 | Default     | Notes                                                    |
 | ---------- | -------------------------------------- | ----------- | -------------------------------------------------------- |
 | query      | `slq query [flags] <fbr-expr>`         | —           | all positional arguments joined into one expression      |
-|            | `slq <fbr-expr>`                       | —           | shortcut because FBR expressions start with `:` or `/`   |
+|            | `slq <fbr-expr>`                       | —           | shortcut for recognized FBR prefixes                     |
 | help       | `slq`                                  | —           | print usage and exit                                     |
 | list       | `slq ls`                               | all sources | list data sources and the record fieldspec               |
 |            | `slq ls [source]`                      | all sources | list source sessions                                     |
@@ -28,6 +28,8 @@ Specify the consumer-visible behavior of the `slq` command, the FBR query langua
 | fields     | `-F FIELDS`, `--fields FIELDS`         | default set | comma-separated display projection                       |
 | time range | `--since`, `--until`                   | —           | filter by `timestamp`                                    |
 | limit      | `-n N`, `--limit N`                    | no limit    | stop after N records                                     |
+
+The implicit query shortcut recognizes expressions beginning with `:`, `/`, `(`, `!`, or the word `not`.
 
 ### FBR Grammar
 
@@ -125,6 +127,7 @@ File-based `DataSource.sessions()` partitions the sorted file list and runs each
 - Unknown field: error listing valid field names and aliases.
 - Invalid regex: error with the failing pattern.
 - Empty regex: error; use `/.*/` to match all values.
+- Invalid timestamp: error naming the rejected `--since` or `--until` value; exit 2.
 - Unavailable source: `slq ls <source>` warns with the unmatched candidate roots and exits 0.
 - Unknown source: error naming the source; exit 2.
 

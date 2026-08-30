@@ -286,7 +286,7 @@ Inspect the actual files under `~/.codex`, `~/.claude`, `~/.devin`, and the Devi
 
 | Field            | Value                                                                                                            |
 | ---------------- | --------------------------------------------------------------------------------------                           |
-| Decision         | The CLI exposes `query` and `ls` subcommands; `query` is implicit when the first argument starts with `:` or `/` |
+| Decision         | The CLI exposes `query` and `ls` subcommands; `query` is implicit for recognized FBR prefixes                    |
 | Rationale        | Keeps the FBR surface a single expression while letting `ls` take a source argument                              |
 | Alternatives     | every command as a top-level flag (`--sources`); separate `slq-ls` tool                                          |
 | Rejection reason | `--sources` is not a query and does not scale; a separate tool splits the CLI                                    |

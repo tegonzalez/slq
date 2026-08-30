@@ -1,4 +1,6 @@
 import io
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -64,7 +66,8 @@ def test_count_query(cli_sources):
     cli.SOURCES = cli_sources
     cli.main(["/count/"], out=out)
     text = out.getvalue()
-    assert "the count is 5" in text or "count is 7" in text
+    assert "the count is 5" in text
+    assert "count is 7" in text
 
 
 def test_count_query_limit(cli_sources):
@@ -107,9 +110,9 @@ def test_projected_fields(cli_sources):
     cli.SOURCES = cli_sources
     cli.main([":k/session/", "-F", "tool,session_id,record_count"], out=out)
     text = out.getvalue()
-    parts = text.split("\t")
-    assert parts[0] == "codex" or parts[0] == "claude"
-    assert "record_count" not in text or "2" in text
+    assert "codex" in text
+    assert "claude" in text
+    assert "2" in text
 
 
 def test_context(cli_sources):
@@ -180,3 +183,52 @@ def test_ls_bare_includes_fieldspec(cli_sources):
     assert "claude" in text
     assert "tool" in text
     assert "timestamp" in text
+
+
+def test_invalid_since_returns_user_error_without_exception(cli_sources):
+    original = cli.SOURCES
+    cli.SOURCES = cli_sources
+    try:
+        out = io.StringIO()
+        err = io.StringIO()
+        rc = cli.main([":kind/user/", "--since", "not-a-time"], out=out, err=err)
+    finally:
+        cli.SOURCES = original
+    assert rc == 2
+    assert "invalid timestamp" in err.getvalue()
+    assert "not-a-time" in err.getvalue()
+
+
+def test_closed_stdout_pipe_exits_without_broken_pipe_error():
+    child_code = """
+import slq.cli as cli
+from slq.schema import Record
+
+
+class Source:
+    name = "pipe"
+
+    def can_answer(self, ast):
+        return True
+
+    def records(self, ast, env=None):
+        for _ in range(10_000):
+            yield Record(tool="pipe", kind="user", content="x" * 100)
+
+
+cli.SOURCES = [Source()]
+raise SystemExit(cli.main(["/x/"]))
+"""
+    process = subprocess.Popen(
+        [sys.executable, "-c", child_code],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    assert process.stdout is not None
+    process.stdout.close()
+    assert process.stderr is not None
+    stderr = process.stderr.read()
+    return_code = process.wait()
+    assert return_code == 0
+    assert "BrokenPipeError" not in stderr
