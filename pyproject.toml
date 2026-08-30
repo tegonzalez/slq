@@ -1,0 +1,24 @@
+[project]
+name = "slq"
+version = "0.1.0"
+description = "A session-log query CLI for Codex and Claude"
+authors = [
+    { name = "Tomas Gonzalez", email = "tegonzalez@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "aiosqlite>=0.22.1,<0.23.0",
+]
+
+[project.scripts]
+slq = "slq.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
