@@ -71,7 +71,7 @@ Plain output selects columns from the query by default. If the query contains on
 
 When `plain` output is written to a TTY, it is rendered as an aligned, headerless table. For `slq ls` and `slq ls <source>` the table is pre-calculated so every row is aligned globally. For `query` output the table is streamed by default: each record is emitted as it is produced, and column widths may increase (but never decrease) as wider records arrive. Long content that would exceed a column is wrapped, with very long tokens broken at the column boundary. `-w`/`--width` opts out of streaming and pre-calculates column widths from the full result set; `-s`/`--stream` opts into streaming even for `ls`. When it is piped or redirected, it is tab-separated.
 
-`slq ls` (source listing) defaults to the fields `tool` and `path`. `slq ls <source>` defaults to the fields `timestamp` and `short_hash`, giving a compact, human-readable session index. The `short_hash` is a source-specific short identifier computed on demand; codex and claude use the first eight characters of the session UUID, while devin uses a 12-16 character hyphen-bounded slug.
+`slq ls` (source listing) defaults to the fields `tool` and `path`. `slq ls <source>` defaults to the fields `timestamp` and `short_hash`, giving a compact, human-readable session index. The `short_hash` is a source-specific short identifier computed on demand; codex, claude, and cursor use the first eight characters of the session UUID, while devin uses a 12-16 character hyphen-bounded slug.
 
 ### Field Discovery
 
@@ -106,7 +106,7 @@ A source declares candidate discovery roots without testing the host. A candidat
 
 ### Source Pushdown
 
-A `DataSource` may skip files or rows based on `tool`, `session`, `date`, `path`, `cwd`, `project`, `kind`, and `content` constraints. File-based sources read files through the `ResourceManager`, which opens each file once and provides a seekable cursor and line-offset cache. Database-backed sources translate applicable AST filters into source-specific queries; for example, the devin source builds a parameterized SQLite `WHERE` clause so regex, kind, timestamp, and session filters run in the database.
+A `DataSource` may skip files or rows based on `tool`, `session`, `date`, `path`, `cwd`, `project`, `kind`, and `content` constraints. File-based sources read files through the `ResourceManager`, which opens each file once and provides a seekable cursor and line-offset cache. Database-backed sources translate applicable AST filters into source-specific queries; the Devin and Cursor sources build parameterized SQLite predicates so regex, kind, timestamp, and session filters run in the database.
 
 ### Parallel Listing
 
@@ -136,5 +136,7 @@ File-based `DataSource.sessions()` partitions the sorted file list and runs each
 - `record_count` and `duration` are available only on `kind=session` records.
 - Multi-GB single session files are read once per process through the `ResourceManager`, which maintains line byte-offsets for seeking and an in-memory cache of parsed objects. Full content is still parsed for queries, but `ls` reads only metadata.
 - Database-backed sources (such as devin) open one connection per query and push applicable filters down to the database. A custom SQLite `REGEXP` UDF supports FBR regex terms.
+- Cursor stores conversations in `state.vscdb` under macOS and Linux candidate paths. Its ISO-8601 and epoch-millisecond timestamps normalize to UTC in SQL pushdown and Python records, including ISO values with an explicit offset.
+- A Cursor event-stream database failure is re-raised to the iterator consumer instead of leaving the consumer waiting for a completion marker.
 - Discovery is owned by `DataSource.default_paths` and the source's admission predicate; there are no per-source path flags.
 - Date matching is regex against the rendered `YYYY-MM-DD HH:MM:SS` timestamp string; no numeric comparison operators exist yet.

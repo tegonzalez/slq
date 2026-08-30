@@ -13,10 +13,10 @@ Define how `slq` is verified before acceptance.
 | Level          | Scope                                                                                      | Owner              | Fixtures                                            |
 | -------------- | -------------------------------------------------------                                    | ------------------ | --------------------------------------              |
 | unit           | `Record`, schema, FBR lexer/parser, AST eval                                               | `slq` test suite   | `tests/fixtures/` JSONL snippets                    |
-| source-adapter | codex, claude, and devin mapping to `Record`                                               | source tests       | sample `rollout-*.jsonl`, `*.jsonl`, and SQLite DBs |
+| source-adapter | codex, claude, cursor, and devin mapping to `Record`                                       | source tests       | sample `rollout-*.jsonl`, `*.jsonl`, and SQLite DBs |
 | source-list    | source admission, availability, listing, and sessions                                      | source tests       | sample source and session fixtures                  |
 | platform       | `logical_cwd()`, `same_path()`, `compatible_python(root)`, and `exec_or_run()`             | `slq` test suite   | temporary interpreters, symlink pairs, PWD values   |
-| integration    | end-to-end `slq` against real `~/.codex`, `~/.claude`, and the Devin CLI sessions database | CI or local        | user's own logs, optional                           |
+| integration    | end-to-end `slq` against real Codex, Claude, Cursor, and Devin stores                      | CI or local        | user's own logs, optional                           |
 | doc-graph      | `dg lint` on governed docs                                                                 | doc-graph protocol | `docs/` and `.planning/`                            |
 
 ## Unit Tests
@@ -86,6 +86,10 @@ Define how `slq` is verified before acceptance.
 - `claude` source emits `Record`s for a sample project session file and builds a session row.
 - `devin` source emits `Record`s for a sample SQLite sessions database and builds a session row.
 - `devin` queries every admitted database rather than selecting the first existing candidate.
+- `cursor` maps synthetic `composerHeaders` and `bubbleId:` rows and pushes kind, content, session, and timestamp filters into SQLite.
+- `cursor` reads all bubbles through one joined query per store and merges every admitted store in timestamp order.
+- Cursor ISO offsets and epoch milliseconds produce the same UTC projection in SQL and Python.
+- A Cursor background database failure reaches the iterator consumer without a hang or thread-only traceback.
 - `devin` `short_hash` is 12-16 characters and distinguishable from codex/claude 8-character UUID prefixes.
 - `codex` and `claude` `sessions()` return `SessionRecord`s with `default_fields = ("timestamp", "short_hash")`.
 - `DataSource.list()` returns one `SourceRecord` per admitted path with `default_fields = ("tool", "path")`.
@@ -108,7 +112,7 @@ Define how `slq` is verified before acceptance.
 - `uv run pytest -x` passes on Linux and macOS with a host-owned virtual environment.
 - `dg lint` passes for every `docs/*.md` and `.planning/*.md`.
 - `slq` can list sources (`slq ls`) and session files (`ls <source>`); bare `slq` prints usage.
-- `slq` can list sessions, filter by date, and grep across codex, claude, and devin logs.
+- `slq` can list sessions, filter by date, and grep across codex, claude, cursor, and devin logs.
 - `slq ls codex` deduplicates a symlinked root and `slq ls` prints only admitted paths.
 - `slq` supports `plain`, `json`, and `text` output.
 - `plain` output aligns columns on a TTY and is tab-separated when piped.
@@ -116,3 +120,4 @@ Define how `slq` is verified before acceptance.
 - `WorkQueue` defaults to `nproc - 1` workers and can be overridden with `SLQ_WORKERS`.
 - `slq ls codex` and `slq ls claude` complete quickly without loading full file contents.
 - `slq ls devin` and devin queries run SQL pushdown and do not fetch every row.
+- `slq ls cursor` and cursor queries run SQL pushdown and do not fetch every bubble.

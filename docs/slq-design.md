@@ -13,7 +13,7 @@ Define the architecture that lets a single `Record` schema, a single query langu
 | Term             | Meaning                                                                                                     |
 | -------------    | ----------------------------------------------------------------------------------------------------------- |
 | `Record`         | Common dataclass produced by every source and consumed by every output                                      |
-| `DataSource`     | Protocol for a source of `Record`s; codex, claude, and devin are initial implementations                    |
+| `DataSource`     | Protocol for a source of `Record`s; codex, claude, cursor, and devin are implementations                    |
 | `candidate root` | Discovery location declared by a source whether or not it exists on this host                               |
 | `admitted path`  | Candidate root that exists, satisfies the source predicate, and is distinct by filesystem identity          |
 | `available`      | A source has at least one admitted path                                                                     |
@@ -62,7 +62,7 @@ Define the architecture that lets a single `Record` schema, a single query langu
 | Product role   | Read local session logs and emit `Record`s                    |
 | Responsibility | Own source-specific backend discovery, filtering, and mapping |
 | Owned seams    | `SLQS-4`, `SLQS-5`                                            |
-| Decisions      | `SLQD-5`, `SLQD-6`                                            |
+| Decisions      | `SLQD-5`, `SLQD-6`, `SLQD-17`, `SLQD-18`                      |
 
 ### `SLQM-4` Cursor and Output
 
@@ -183,7 +183,18 @@ All sources implement `DataSource.can_answer(ast)`, `DataSource.records(ast, env
 - Session row: `kind='session'`, `record_id=session_id`, `content` = concatenated event content (or summary when the query excludes `kind=session`), `record_count` and `duration` from first/last event and the `message_nodes` row count.
 - The short hash is computed from the session slug, hyphen-bounded, and 12-16 characters long so it is visually distinct from the 8-character codex/claude UUID prefixes.
 
-Inspect the actual files under `~/.codex`, `~/.claude`, `~/.devin`, and the Devin CLI share directories to confirm field names; the structure may vary by tool version.
+### Cursor
+
+- Candidate roots: `~/Library/Application Support/Cursor/User/globalStorage/state.vscdb` and `~/.config/Cursor/User/globalStorage/state.vscdb`.
+- Admission predicate: the candidate is an existing `state.vscdb` file or a directory containing one at its root or under `User/globalStorage`; every distinct resolved store is queried.
+- `composerHeaders` supplies session metadata and `cursorDiskKV` keys in the `bubbleId:<composer-id>:<bubble-id>` range supply events.
+- One joined, parameterized `aiosqlite` statement reads events across all composers in a store. `SQLBuilder` pushes tool, session, timestamp, kind, role, content, cwd, and project predicates into that statement.
+- Cursor timestamps may be ISO-8601 strings or epoch milliseconds. SQL projects both as UTC display strings, and record mapping normalizes parsed datetimes to UTC so offsets have the same Python representation.
+- The async event producer streams through a bounded queue. Completion is signaled in a `finally` path and a producer exception is re-raised by the consuming iterator.
+- Bubble type `1` maps to `kind=user` and `role=user`; type `2` maps to `kind=agent` and `role=assistant`; other values map to `other`.
+- Session rows use the composer id, header name or subtitle, UTC creation/update timestamps, duration, and a bubble-range count.
+
+Inspect the actual files under `~/.codex`, `~/.claude`, the Cursor global-storage directory, `~/.devin`, and the Devin CLI share directories to confirm field names; the structure may vary by tool version.
 
 ### Seam Inventory
 
@@ -357,6 +368,17 @@ Inspect the actual files under `~/.codex`, `~/.claude`, `~/.devin`, and the Devi
 | Rejection reason  | Unconditional listing advertises missing stores; first-existing selection drops data; path flags move source layout into the CLI                                                                                          |
 | Affected surfaces | `DataSource`, Codex, Claude, Devin, `slq ls`, and query dispatch                                                                                                                                                          |
 | Status            | current                                                                                                                                                                                                                   |
+
+### `SLQD-18` Cursor Streams One Joined Query per Store
+
+| Field             | Value                                                                                                                                                                                                                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decision          | The Cursor source streams `composerHeaders` and `cursorDiskKV` through one joined, pushed-down query per admitted store and propagates producer failures to the iterator consumer                                                                                                     |
+| Rationale         | One statement avoids per-composer queries, a bounded queue preserves lazy delivery, explicit completion prevents deadlock, and UTC normalization keeps pushed-down timestamps equivalent to Python evaluation                                                                         |
+| Alternatives      | One event query per composer; synchronous eager reads; an unguarded thread sentinel; preserving ISO wall-clock offsets in Python                                                                                                                                                      |
+| Rejection reason  | Per-composer queries create N+1 traffic; eager reads defeat streaming; an exception before an unguarded sentinel leaves the consumer blocked; retaining wall-clock offsets disagrees with SQLite's UTC normalization                                                                  |
+| Affected surfaces | `src/slq/sources/cursor.py`, `src/slq/sources/cursor_sql.py`, `SQLBuilder`, and source registration                                                                                                                                                                                   |
+| Status            | current                                                                                                                                                                                                                                                                               |
 
 ### `SLQD-11` On-Demand File Access
 

@@ -4,19 +4,19 @@ doc-graph: "When there is an intention to amend this document, first Adhere to [
 
 # slq
 
-`slq` is a small command-line tool for querying session logs from Codex, Claude, and Devin with one language and one `Record` schema. It runs on Linux and macOS.
+`slq` is a small command-line tool for querying session logs from Codex, Claude, Cursor, and Devin with one language and one `Record` schema. It runs on Linux and macOS.
 
 ## Features
 
 | Feature                          | What it gives you                                                                            |
 | -------------------------------- | --------------------------------------------------------------                               |
-| Single query surface             | Query Codex, Claude, and Devin logs with the same FBR expression                             |
+| Single query surface             | Query Codex, Claude, Cursor, and Devin logs with the same FBR expression                     |
 | Field-bounded regex (FBR)        | `:k/session/`, `:d/2026-08-29/`, `/count/`, `!`, `and`, `or`                                 |
 | Source pushdown                  | Skip files the query proves cannot match                                                     |
 | Lazy cursor                      | Stream records one pass; limit, time range, and stats overlays                               |
 | Context output                   | Grep-style `-C N` context around matching records                                            |
 | Multiple formats                 | `plain`, `json`, and `text` (TTY-aware table) output                                         |
-| Source listing                   | `slq ls`, `slq ls codex`; only stores that exist are listed                                  |
+| Source listing                   | `slq ls`, `slq ls codex`, `slq ls cursor`; only stores that exist are listed                 |
 | POSIX portability                | One code path on Linux and macOS; per-host stores are candidate roots, not host tests        |
 | Parallel listing                 | `WorkQueue` starts 1 worker and spawns more only when chunks exceed 10 ms, up to `nproc - 1` |
 | Polymorphic fields               | `Record` subclasses choose default fields; `record_field` metadata dispatches renderers      |
@@ -73,6 +73,9 @@ slq ls fields
 
 # List codex session files (timestamp and short hash)
 slq ls codex
+
+# List Cursor conversations from the local Cursor SQLite store
+slq ls cursor
 
 # List all sessions from every available source (use `-n N` for large histories)
 slq :kind/session/

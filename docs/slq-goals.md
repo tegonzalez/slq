@@ -28,7 +28,7 @@ Define the durable outcomes that make `slq` a trustworthy session-log query tool
 
 ## Success Criteria
 
-- `slq` runs against every admitted local Codex, Claude, and Devin store with no source-specific flags.
+- `slq` runs against every admitted local Codex, Claude, Cursor, and Devin store with no source-specific flags.
 - A source with no admitted path is absent from `slq ls` and is skipped by queries instead of failing.
 - `slq ls codex` lists sessions from `~/.codex/sessions` and lists a symlinked root once.
 - A query with `:s/5df37bef/` opens only the matching session file.

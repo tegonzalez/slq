@@ -1,7 +1,7 @@
 [project]
 name = "slq"
 version = "0.1.0"
-description = "A session-log query CLI for Codex and Claude"
+description = "A session-log query CLI for Codex, Claude, Cursor, and Devin"
 authors = [
     { name = "Tomas Gonzalez", email = "tegonzalez@gmail.com" }
 ]
@@ -21,4 +21,3 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.1.1",
 ]
-
