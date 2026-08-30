@@ -49,6 +49,7 @@ Define how `slq` is verified before acceptance.
 - Verify `present.term.stream_table` widens columns as rows arrive and wraps long tokens.
 - Verify `-w`/`--width` pre-calculates column widths and globally aligns `plain` TTY output, and `-s`/`--stream` streams output.
 - Verify `content` truncation starts at the first match offset when the query provides one.
+- Verify the 240-character content limit is applied after newline expansion and that raw match offsets are translated to sanitized display offsets.
 
 ### Resource Manager and WorkQueue
 

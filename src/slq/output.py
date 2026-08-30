@@ -90,24 +90,44 @@ _ANSI_RE = re.compile(
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
-def _render_value(value: str, field: str, hint: Optional[int] = None) -> str:
-    """Sanitize a field value for terminal or tab-separated display.
+def _sanitize(text: str) -> str:
+    """Return the display form of ``text``.
 
     ANSI/terminal escape sequences are removed, tabs and line breaks are
     replaced with displayable markers, and remaining control characters are
     stripped so one record always occupies exactly one output line. Newlines
     are rendered as ``[lf]`` so wrapped content remains visually explicit.
     """
-    if field == "content" and hint is not None:
-        value = _truncate_around(value, hint)
-    value = _ANSI_RE.sub("", value)
-    value = value.replace("\r\n", "\n").replace("\r", "\n")
-    value = value.replace("\t", " ")
-    value = value.replace("\n", "[lf]")
-    value = _CONTROL_RE.sub("", value)
-    if field == "content" and hint is None:
-        value = _truncate(value)
-    return value
+    text = _ANSI_RE.sub("", text)
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    text = text.replace("\t", " ")
+    text = text.replace("\n", "[lf]")
+    text = _CONTROL_RE.sub("", text)
+    return text
+
+
+def _display_offset(text: str, raw_offset: int) -> int:
+    """Return the display column that corresponds to ``raw_offset`` in ``text``.
+
+    This is the length of ``_sanitize(text[:raw_offset])``.
+    """
+    return len(_sanitize(text[:raw_offset]))
+
+
+def _render_value(value: str, field: str, hint: Optional[int] = None) -> str:
+    """Sanitize a field value for terminal or tab-separated display.
+
+    For ``content``, the 240-character limit is applied to the *display*
+    string after newlines have been expanded to ``[lf]``, so every printed
+    line has at most 240 content display characters.
+    """
+    if field != "content":
+        return _sanitize(value)
+    display_value = _sanitize(value)
+    if hint is not None:
+        display_hint = _display_offset(value, hint)
+        return _truncate_around(display_value, display_hint)
+    return _truncate(display_value)
 
 
 def _write_plain_line(record: Record, fields: List[str], out: TextIO) -> None:

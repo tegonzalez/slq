@@ -137,3 +137,30 @@ def test_plain_content_truncated_without_hint():
     render_records([record], "plain", out=out)
     text = out.getvalue()
     assert "... [truncated]" in text
+
+
+def test_content_truncation_counts_display_chars_after_lf_expansion():
+    # 100 newlines plus 100 normal chars -> raw length 200, display length 499.
+    # After rendering, the content cell should be at most 240 display chars
+    # plus the truncation marker.
+    record = Record(content="\n" * 100 + "x" * 100)
+    out = io.StringIO()
+    render_records([record], "plain", out=out)
+    cell = out.getvalue().strip().rsplit("\t", 1)[-1]
+    assert cell.endswith("... [truncated]")
+    # The visible content before the marker is at most 240 chars.
+    assert len(cell.removesuffix(" ... [truncated]")) <= 240
+
+
+def test_match_truncation_counts_display_chars_after_lf_expansion():
+    # Match text starts right after 50 newlines; each becomes 4 display chars.
+    # The window of 240 display chars may include fewer raw chars, but the
+    # match must still be visible at the start of the cell.
+    content = "\n" * 50 + "needle" + "y" * 500
+    record = Record(content=content, meta={"hint": {"content": 50}})
+    out = io.StringIO()
+    render_records([record], "plain", out=out)
+    cell = out.getvalue().strip().rsplit("\t", 1)[-1]
+    assert cell.startswith("needle")
+    assert cell.endswith("... [truncated]")
+    assert len(cell.removesuffix(" ... [truncated]")) <= 240
