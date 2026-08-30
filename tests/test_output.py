@@ -116,3 +116,24 @@ def test_precompute_widths_preserves_global_alignment():
         assert _display_width(line) <= 80
     # The first row should be padded to the wider "bbbb" column.
     assert "a   " in text or "a    " in text
+
+
+def test_truncate_around_match_hint():
+    content = "x" * 250 + "needle" + "y" * 250
+    record = Record(content=content, meta={"hint": {"content": 250}})
+    out = io.StringIO()
+    render_records([record], "plain", out=out)
+    text = out.getvalue()
+    assert "needle" in text
+    # The content cell starts with the match and ends with the truncation marker.
+    cell = text.strip().rsplit("\t", 1)[-1]
+    assert cell.startswith("needle")
+    assert cell.endswith("... [truncated]")
+
+
+def test_plain_content_truncated_without_hint():
+    record = Record(content="x" * 300)
+    out = io.StringIO()
+    render_records([record], "plain", out=out)
+    text = out.getvalue()
+    assert "... [truncated]" in text

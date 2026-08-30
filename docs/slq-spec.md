@@ -42,7 +42,7 @@ global    := delim regex delim
 field     := [A-Za-z_][A-Za-z0-9_]*
 delim     := any non-whitespace, non-alphanumeric, non-underscore char
              except: ! & | ( ) , :
-regex     := any string not containing the chosen delim
+regex     := any non-empty string not containing the chosen delim
 ws        := one or more whitespace characters
 ```
 
@@ -65,7 +65,7 @@ Every source and every output record uses:
 
 Plain output selects columns from the query by default. If the query contains only filter terms, those fields are displayed. If the query contains display-only terms (`:<field>` with no regex), the output shows exactly those selected fields, in order. `-F/--fields` overrides this auto-projection.
 
-`content` is truncated to 240 characters, with ` ... [truncated]` appended. Embedded newlines are rendered as `[lf]` and ANSI/terminal escape sequences are stripped so one record always occupies one output line and cannot corrupt a TTY. `timestamp` is rendered as a human-readable `YYYY-MM-DD HH:MM:SS` string.
+`content` is truncated to 240 characters, with ` ... [truncated]` appended. When the query matches a `content` value, the truncated output starts at the first match offset so the matched text is at position 0 and remains visible. Embedded newlines are rendered as `[lf]` and ANSI/terminal escape sequences are stripped so one record always occupies one output line and cannot corrupt a TTY. `timestamp` is rendered as a human-readable `YYYY-MM-DD HH:MM:SS` string.
 
 When `plain` output is written to a TTY, it is rendered as an aligned, headerless table. For `slq ls` and `slq ls <source>` the table is pre-calculated so every row is aligned globally. For `query` output the table is streamed by default: each record is emitted as it is produced, and column widths may increase (but never decrease) as wider records arrive. Long content that would exceed a column is wrapped, with very long tokens broken at the column boundary. `-w`/`--width` opts out of streaming and pre-calculates column widths from the full result set; `-s`/`--stream` opts into streaming even for `ls`. When it is piped or redirected, it is tab-separated.
 
@@ -105,6 +105,7 @@ File-based `DataSource.sessions()` partitions the sorted file list and runs each
 
 - Unknown field: error listing valid field names and aliases.
 - Invalid regex: error with the failing pattern.
+- Empty regex: error; use `/.*/` to match all values.
 - Missing source paths: warning with `slq ls` output.
 
 ## Precision and Gaps

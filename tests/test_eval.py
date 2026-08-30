@@ -44,3 +44,34 @@ def test_eval_timestamp():
 def test_eval_session_only_fields():
     r = make_record(kind="session", record_count=3)
     assert evaluate(r, parse(":record_count/3/"))
+
+
+def test_eval_sets_hint():
+    r = make_record(content="the count is 5")
+    ast = parse("/count/")
+    assert evaluate(r, ast)
+    assert ast.hint == 4
+    assert r.meta["hint"]["content"] == 4
+
+
+def test_eval_hint_not_set_when_negated():
+    r = make_record(content="the total is 5")
+    ast = parse("! /count/")
+    assert evaluate(r, ast)
+    assert "hint" not in r.meta
+
+
+def test_eval_hint_earliest_for_and():
+    r = make_record(content="one two three two one")
+    ast = parse("/one/ /two/")
+    assert evaluate(r, ast)
+    # The earliest match across both regexes is "one" at offset 0.
+    assert r.meta["hint"]["content"] == 0
+
+
+def test_eval_display_only_does_not_overwrite_hint():
+    r = make_record(kind="user", content="the lint is here")
+    ast = parse(":k/user/:content/lint/:tool:content")
+    assert evaluate(r, ast)
+    # The display-only :content term must not reset the content hint to 0.
+    assert r.meta["hint"]["content"] == 4

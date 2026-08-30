@@ -23,6 +23,7 @@ class Regex(QueryAST):
     field: str
     pattern: "re.Pattern[str]"
     raw: str
+    hint: Optional[int] = None
 
 
 @dataclasses.dataclass
@@ -221,6 +222,8 @@ class _Parser:
         if self.eof():
             raise ParseError(f"unterminated regex; missing closing {delim!r}")
         raw = self.text[start:self.pos]
+        if raw == "":
+            raise ParseError("empty regex is not allowed; use /.*/ to match all")
         self.next()  # consume closing delimiter
         canonical = resolve_field_prefix(field) if field else "content"
         return Regex(field=canonical, pattern=_compile(raw), raw=raw)
@@ -233,6 +236,8 @@ class _Parser:
         if self.eof():
             raise ParseError(f"unterminated regex; missing closing {delim!r}")
         raw = self.text[start:self.pos]
+        if raw == "":
+            raise ParseError("empty regex is not allowed; use /.*/ to match all")
         self.next()  # consume closing delimiter
         return Regex(field="content", pattern=_compile(raw), raw=raw)
 

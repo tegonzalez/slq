@@ -47,6 +47,7 @@ Define how `slq` is verified before acceptance.
 - Verify `present.term.format_table` handles atomic cells, wrapping, and narrow TTY widths.
 - Verify `present.term.stream_table` widens columns as rows arrive and wraps long tokens.
 - Verify `-w`/`--width` pre-calculates column widths and globally aligns `plain` TTY output, and `-s`/`--stream` streams output.
+- Verify `content` truncation starts at the first match offset when the query provides one.
 
 ### Resource Manager and WorkQueue
 

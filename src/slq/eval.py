@@ -5,16 +5,30 @@ from .query import And, Not, Or, QueryAST, Regex
 from .schema import Record, record_value
 
 
-def evaluate(record: Record, ast: QueryAST) -> bool:
+def evaluate(record: Record, ast: QueryAST, negated: bool = False) -> bool:
     if isinstance(ast, Regex):
         value = record_value(record, ast.field)
-        return bool(ast.pattern.search(value))
+        match = ast.pattern.search(value)
+        if match and not negated and ast.raw != "":
+            offset = match.start()
+            ast.hint = offset
+            hints = record.meta.setdefault("hint", {})
+            if ast.field not in hints or offset < hints[ast.field]:
+                hints[ast.field] = offset
+        return bool(match)
     if isinstance(ast, Not):
-        return not evaluate(record, ast.operand)
+        return not evaluate(record, ast.operand, not negated)
     if isinstance(ast, And):
-        return all(evaluate(record, op) for op in ast.operands)
+        for op in ast.operands:
+            if not evaluate(record, op, negated):
+                return False
+        return True
     if isinstance(ast, Or):
-        return any(evaluate(record, op) for op in ast.operands)
+        result = False
+        for op in ast.operands:
+            if evaluate(record, op, negated):
+                result = True
+        return result
     raise TypeError(f"unknown AST node {ast!r}")
 
 

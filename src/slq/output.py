@@ -90,7 +90,7 @@ _ANSI_RE = re.compile(
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
-def _render_value(value: str, field: str) -> str:
+def _render_value(value: str, field: str, hint: Optional[int] = None) -> str:
     """Sanitize a field value for terminal or tab-separated display.
 
     ANSI/terminal escape sequences are removed, tabs and line breaks are
@@ -98,25 +98,29 @@ def _render_value(value: str, field: str) -> str:
     stripped so one record always occupies exactly one output line. Newlines
     are rendered as ``[lf]`` so wrapped content remains visually explicit.
     """
+    if field == "content" and hint is not None:
+        value = _truncate_around(value, hint)
     value = _ANSI_RE.sub("", value)
     value = value.replace("\r\n", "\n").replace("\r", "\n")
     value = value.replace("\t", " ")
     value = value.replace("\n", "[lf]")
     value = _CONTROL_RE.sub("", value)
-    if field == "content":
+    if field == "content" and hint is None:
         value = _truncate(value)
     return value
 
 
 def _write_plain_line(record: Record, fields: List[str], out: TextIO) -> None:
     parts: List[str] = []
+    hints = record.meta.get("hint", {})
     for f in fields:
         value = record_value(record, f)
         if not value:
             value = "-"
-        value = _render_value(value, f)
+        value = _render_value(value, f, hints.get(f))
         parts.append(value)
     out.write("\t".join(parts) + "\n")
+    out.flush()
 
 
 def _json_records(
@@ -129,6 +133,7 @@ def _json_records(
         if record.meta.get("context"):
             obj["context"] = record.meta["context"]
         out.write(json.dumps(obj, default=_json_default, sort_keys=True) + "\n")
+        out.flush()
 
 
 def _stream_text_records(
@@ -141,11 +146,12 @@ def _stream_text_records(
     def rows() -> Iterator[List[str]]:
         for record in records:
             row: List[str] = []
+            hints = record.meta.get("hint", {})
             for f in fields:
                 value = record_value(record, f)
                 if not value:
                     value = "-"
-                value = _render_value(value, f)
+                value = _render_value(value, f, hints.get(f))
                 row.append(value)
             ctx = record.meta.get("context")
             if ctx:
@@ -155,6 +161,7 @@ def _stream_text_records(
 
     for line in stream_table(fields, rows(), max_col=36):
         out.write(line + "\n")
+        out.flush()
 
 
 def _text_records(
@@ -172,11 +179,12 @@ def _text_records(
         if ctx:
             has_context = True
         row = []
+        hints = record.meta.get("hint", {})
         for f in fields:
             value = record_value(record, f)
             if not value:
                 value = "-"
-            value = _render_value(value, f)
+            value = _render_value(value, f, hints.get(f))
             row.append(value)
         rows.append(row)
 
@@ -191,8 +199,9 @@ def _text_records(
         return
     if not include_header:
         out.write(format_table(headers, rows, show_header=False) + "\n")
-        return
-    out.write(format_table(headers, rows, show_header=show_header) + "\n")
+    else:
+        out.write(format_table(headers, rows, show_header=show_header) + "\n")
+    out.flush()
 
 
 def _record_dict(record: Record, fields: List[str]) -> dict:
@@ -207,3 +216,15 @@ def _truncate(text: str, width: int = 240) -> str:
     if len(text) <= width:
         return text
     return text[:width] + " ... [truncated]"
+
+
+def _truncate_around(text: str, hint: int, width: int = 240) -> str:
+    if len(text) <= width:
+        return text
+    # Anchor the truncated cell at the match so the matched text is at
+    # position 0, then take the full width so the cell is not truncated
+    # before the requested number of characters.
+    snippet = text[hint:hint + width]
+    if hint + width < len(text):
+        snippet = snippet + " ... [truncated]"
+    return snippet

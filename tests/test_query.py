@@ -108,8 +108,8 @@ def test_parse_prefix_ambiguous():
 
 
 def test_parse_empty_regex():
-    ast = parse("//")
-    assert ast.raw == ""
+    with pytest.raises(ParseError):
+        parse("//")
 
 
 def test_parse_display_only_field():
