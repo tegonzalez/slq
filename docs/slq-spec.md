@@ -83,6 +83,17 @@ A query evaluates to a lazy `Cursor` of `Record`s. By default both event and ses
 
 A field name with no regex (`:<field>`) is a display-only term. It selects the field for output but does not constrain records. If a query contains any display-only terms, the output shows exactly those fields; otherwise it shows the fields used by the filter terms.
 
+### Platform Primitives
+
+`src/slq/platform.py` exposes the POSIX process and path primitives used by the package:
+
+- `logical_cwd()` returns the working directory, preserving the absolute `PWD` spelling when it names the process working directory.
+- `same_path(a, b)` returns true when two paths name the same filesystem object, including a symlink and its target.
+- `compatible_python(root)` returns `<root>/.venv/bin/python` only when it is the running interpreter or can execute and report the same machine, byte order, word size, Python version, and implementation; otherwise it returns `sys.executable`.
+- `exec_or_run(argv)` currently runs `argv` as a child process. It is reserved for a future interactive process-replacement path.
+
+`uv sync` installs the project into a host-owned virtual environment. `uv run slq` and `uv tool install` invoke `slq.cli:main` through the generated console script.
+
 ### Source Pushdown
 
 A `DataSource` may skip files or rows based on `tool`, `session`, `date`, `path`, `cwd`, `project`, `kind`, and `content` constraints. File-based sources read files through the `ResourceManager`, which opens each file once and provides a seekable cursor and line-offset cache. Database-backed sources translate applicable AST filters into source-specific queries; for example, the devin source builds a parameterized SQLite `WHERE` clause so regex, kind, timestamp, and session filters run in the database.

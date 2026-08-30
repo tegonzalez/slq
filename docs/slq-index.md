@@ -45,6 +45,7 @@ A missing owner gates only an authority question routed by this index; a nearby 
 | What record fields can I query?      | derived | product specification → architecture design | `slq ls fields`, `FieldRecord`, `Record.record_fields`    | Gate on first missing owner       |
 | How are field prefixes resolved?     | derived | product specification → architecture design | `resolve_field_prefix`, `VALID_FIELD_NAMES`               | Gate on first missing owner       |
 | How is the output projection chosen? | derived | product specification → architecture design | `extract_output_fields`, display-only `:<field>` terms    | Gate on first missing owner       |
+| How are platform paths compared?     | derived | architecture design → guidelines            | `logical_cwd`, `same_path`, `compatible_python`           | Gate on first missing owner       |
 
 ## Durable Boundary
 

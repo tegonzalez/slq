@@ -15,6 +15,7 @@ Define how `slq` is verified before acceptance.
 | unit           | `Record`, schema, FBR lexer/parser, AST eval                                               | `slq` test suite   | `tests/fixtures/` JSONL snippets                    |
 | source-adapter | codex, claude, and devin mapping to `Record`                                               | source tests       | sample `rollout-*.jsonl`, `*.jsonl`, and SQLite DBs |
 | source-list    | `DataSource.list()` and `DataSource.sessions()`                                            | source tests       | sample source and session fixtures                  |
+| platform       | `logical_cwd()`, `same_path()`, `compatible_python(root)`, and `exec_or_run()`             | `slq` test suite   | temporary interpreters, symlink pairs, PWD values   |
 | integration    | end-to-end `slq` against real `~/.codex`, `~/.claude`, and the Devin CLI sessions database | CI or local        | user's own logs, optional                           |
 | doc-graph      | `dg lint` on governed docs                                                                 | doc-graph protocol | `docs/` and `.planning/`                            |
 
@@ -61,6 +62,14 @@ Define how `slq` is verified before acceptance.
 - `SQLBuilder` translates FBR ASTs into parameterized `WHERE` clauses for SQLite, including `AND`, `OR`, `NOT`, regex, `kind`, `timestamp`, and `session_id` constraints.
 - `QueryRequest` carries the AST, `since`/`until` bounds, and source environment to every `DataSource.records()` call.
 
+### Platform
+
+- `logical_cwd()` returns `PWD` when it is absolute and names the process working directory; otherwise it returns the process working directory.
+- `same_path()` treats two paths to one filesystem object, including a symlink and its target, as equal.
+- `compatible_python(root)` accepts the project interpreter when it is the running interpreter or reports the running process ABI, and falls back for a missing, unreadable, non-runnable, or foreign candidate.
+- A candidate that merely shares the running interpreter's binary magic is not accepted without executing the ABI probe.
+- `exec_or_run(argv)` runs a child process through the reserved platform seam.
+
 ## Source Adapter Tests
 
 - `codex` source emits `Record`s for a sample rollout file and builds a session row when requested.
@@ -84,7 +93,7 @@ Define how `slq` is verified before acceptance.
 
 ## Acceptance Criteria
 
-- `pytest` passes.
+- `uv run pytest -x` passes.
 - `dg lint` passes for every `docs/*.md` and `.planning/*.md`.
 - `slq` can list sources (`slq ls`) and session files (`ls <source>`); bare `slq` prints usage.
 - `slq` can list sessions, filter by date, and grep across codex, claude, and devin logs.

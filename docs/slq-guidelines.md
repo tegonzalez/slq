@@ -82,6 +82,10 @@ Every `Record` field is declared with `record_field(..., format="...")` and, whe
 
 When a source has a native query layer (SQLite, an index, or another structured backend), translate the `QueryRequest` into the native language and push `tool`, `session_id`, `timestamp`, `kind`, and `content` constraints down to it. Keep the translation localized to the source and test it with deterministic fixtures. This preserves the `DataSource` protocol while avoiding unnecessary data transfer.
 
+### `SLQG-020` Keep Process and Path Primitives in `platform`
+
+Keep POSIX process and path primitives in `src/slq/platform.py` as `logical_cwd()`, `same_path(a, b)`, `compatible_python(root)`, and `exec_or_run(argv)`. Call these primitives from commands and sources instead of inspecting the host at each use site. This keeps host-sensitive behavior in one readable module.
+
 ## Validation
 
 - Every guideline names an action and the benefit.

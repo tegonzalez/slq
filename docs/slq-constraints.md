@@ -66,6 +66,10 @@ Duplicating rendering logic for timestamps, hashes, or short hashes inside each 
 
 Starting all `WorkQueue` workers at initialization wastes threads for fast or small listings. Detect a `WorkQueue` constructor that creates `nproc - 1` threads before any work is submitted. Start with one worker and spawn additional workers only when a queued task waits longer than the configured quantum and no idle worker is available.
 
+### `SLQC-015` Host Branching in Commands and Sources
+
+Branching on `sys.platform`, `os.name`, or `platform.system()` inside command or source modules turns every supported host into a separate code path. Detect host tests or interpreter and path-identity logic outside `src/slq/platform.py`. Keep those primitives in `platform.py` and call them unconditionally from their consumers.
+
 ## Validation
 
 - Every entry names a failure pattern, why it fails, a detection signal, and replacement guidance.
