@@ -1,5 +1,6 @@
 import argparse
 import datetime
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, Iterable, Iterator, List, Optional, TextIO
@@ -90,6 +91,14 @@ def main(argv: Optional[List[str]] = None, out: TextIO = sys.stdout, err: TextIO
         return 130
     except BrokenPipeError:
         get_workqueue().shutdown(wait=False)
+        # Redirect stdout to /dev/null so the interpreter's final flush of
+        # sys.stdout on shutdown does not print an ignored exception.
+        try:
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, sys.stdout.fileno())
+            os.close(devnull)
+        except (OSError, ValueError):
+            pass
         return 0
     except SystemExit as exc:
         code = exc.code if isinstance(exc.code, int) else 2
@@ -157,7 +166,11 @@ def _preprocess_argv(argv: List[str]) -> List[str]:
     rest = argv[i + 1 :]
     if first in ("query", "ls"):
         return [first] + leading + rest
-    if first.startswith(":") or first.startswith("/"):
+    first_word = first.split()[0] if first.split() else ""
+    if (
+        first_word in ("not", "!")
+        or first_word.startswith(("(", ":", "/", "!"))
+    ):
         return ["query"] + leading + [first] + rest
     return ["ls"] + leading + [first] + rest
 

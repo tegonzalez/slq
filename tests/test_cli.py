@@ -29,6 +29,36 @@ def test_list_sessions(cli_sources):
     assert "session" in text
 
 
+def test_query_not(cli_sources):
+    out = io.StringIO()
+    err = io.StringIO()
+    cli.SOURCES = cli_sources
+    rc = cli.main(["not :k/session/"], out=out, err=err)
+    assert rc == 0
+    text = out.getvalue()
+    assert "user" in text
+    assert "session" not in text or text.count("session") == 0
+
+
+def test_query_bang(cli_sources):
+    out = io.StringIO()
+    err = io.StringIO()
+    cli.SOURCES = cli_sources
+    rc = cli.main(["! :k/session/"], out=out, err=err)
+    assert rc == 0
+    assert "user" in out.getvalue()
+
+
+def test_query_parens(cli_sources):
+    out = io.StringIO()
+    err = io.StringIO()
+    cli.SOURCES = cli_sources
+    rc = cli.main(["(:k/user/ or :k/agent/) /count/"], out=out, err=err)
+    assert rc == 0
+    text = out.getvalue()
+    assert "count" in text.lower()
+
+
 def test_count_query(cli_sources):
     out = io.StringIO()
     cli.SOURCES = cli_sources
