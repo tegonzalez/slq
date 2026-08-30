@@ -70,6 +70,10 @@ Starting all `WorkQueue` workers at initialization wastes threads for fast or sm
 
 Branching on `sys.platform`, `os.name`, or `platform.system()` inside command or source modules turns every supported host into a separate code path. Detect host tests or interpreter and path-identity logic outside `src/slq/platform.py`. Keep those primitives in `platform.py` and call them unconditionally from their consumers.
 
+### `SLQC-016` Single-Root Source Discovery
+
+Selecting the first existing root or indexing `paths[0]` silently drops sessions from other stores and can list a symlinked store twice. Detect first-existing-only probes, unconditional one-element candidate lists, and direct first-element indexing in source readers. Return every candidate root, admit and deduplicate it through `DataSource.admitted_paths()`, and iterate the complete result.
+
 ## Validation
 
 - Every entry names a failure pattern, why it fails, a detection signal, and replacement guidance.

@@ -63,28 +63,16 @@ class DevinSource(DataSource):
     def default_paths(self) -> List[Path]:
         if self._paths:
             return self._paths
-        for p in (
+        return [
             Path.home() / ".devin" / "sessions.db",
             Path.home() / ".local-rw" / "share" / "devin" / "cli" / "sessions.db",
             Path.home() / ".local" / "share" / "devin" / "cli" / "sessions.db",
-        ):
-            if p.exists():
-                return [p]
-        return [Path.home() / ".local-rw" / "share" / "devin" / "cli" / "sessions.db"]
-
-    def _db_path(self, env: Optional[Dict[str, Any]]) -> Path:
-        paths = (env or {}).get("paths") or self.default_paths
-        if not paths:
-            return self.default_paths[0]
-        return Path(paths[0])
+        ]
 
     def sessions(self, env: Optional[Dict[str, Any]] = None) -> Iterator[Record]:
-        path = self._db_path(env)
-        if not path.exists():
-            return
         result: List[Record] = []
 
-        async def _run() -> None:
+        async def _run(path: Path) -> None:
             async with self._open_db(path) as db:
                 await self._init_db(db)
                 sql = self._session_sql()
@@ -94,7 +82,9 @@ class DevinSource(DataSource):
                         if rec:
                             result.append(rec)
 
-        asyncio.run(_run())
+        for path in self.admitted_paths(env):
+            asyncio.run(_run(path))
+
         result.sort(key=_session_sort_key)
         for rec in result:
             yield rec
@@ -108,22 +98,21 @@ class DevinSource(DataSource):
         since = env.get("since")
         until = env.get("until")
         request = QueryRequest(ast=ast, env=env, since=since, until=until)
-        path = self._db_path(env)
-        if not path.exists():
-            return
 
-        q: queue.Queue = queue.Queue(maxsize=64)
+        for path in self.admitted_paths(env):
+            q: queue.Queue = queue.Queue(maxsize=64)
 
-        def _runner() -> None:
-            asyncio.run(self._records_async(request, path, q))
+            def _runner(p: Path = path) -> None:
+                asyncio.run(self._records_async(request, p, q))
 
-        thread = threading.Thread(target=_runner, daemon=True)
-        thread.start()
-        while True:
-            rec = q.get()
-            if rec is None:
-                break
-            yield rec
+            thread = threading.Thread(target=_runner, daemon=True)
+            thread.start()
+            while True:
+                rec = q.get()
+                if rec is None:
+                    break
+                yield rec
+            thread.join()
 
     async def _records_async(
         self,

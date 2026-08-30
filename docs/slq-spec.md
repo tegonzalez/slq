@@ -83,6 +83,14 @@ A query evaluates to a lazy `Cursor` of `Record`s. By default both event and ses
 
 A field name with no regex (`:<field>`) is a display-only term. It selects the field for output but does not constrain records. If a query contains any display-only terms, the output shows exactly those fields; otherwise it shows the fields used by the filter terms.
 
+### Source Availability and Discovery
+
+`slq` supports Linux and macOS. Windows is not supported.
+
+A source declares candidate discovery roots without testing the host. A candidate root becomes an admitted path when it exists, satisfies the source's admission predicate, and is distinct from its other roots by filesystem identity. A source is available when it has at least one admitted path.
+
+`slq ls` emits one row per admitted path. An unavailable source contributes no rows. `slq ls <source>` on a known but unavailable source warns on stderr, emits no rows, and exits 0; an unknown source exits 2. Queries skip unavailable sources without a diagnostic.
+
 ### Platform Primitives
 
 `src/slq/platform.py` exposes the POSIX process and path primitives used by the package:
@@ -117,11 +125,13 @@ File-based `DataSource.sessions()` partitions the sorted file list and runs each
 - Unknown field: error listing valid field names and aliases.
 - Invalid regex: error with the failing pattern.
 - Empty regex: error; use `/.*/` to match all values.
-- Missing source paths: warning with `slq ls` output.
+- Unavailable source: `slq ls <source>` warns with the unmatched candidate roots and exits 0.
+- Unknown source: error naming the source; exit 2.
 
 ## Precision and Gaps
 
 - `record_count` and `duration` are available only on `kind=session` records.
 - Multi-GB single session files are read once per process through the `ResourceManager`, which maintains line byte-offsets for seeking and an in-memory cache of parsed objects. Full content is still parsed for queries, but `ls` reads only metadata.
 - Database-backed sources (such as devin) open one connection per query and push applicable filters down to the database. A custom SQLite `REGEXP` UDF supports FBR regex terms.
+- Discovery is owned by `DataSource.default_paths` and the source's admission predicate; there are no per-source path flags.
 - Date matching is regex against the rendered `YYYY-MM-DD HH:MM:SS` timestamp string; no numeric comparison operators exist yet.

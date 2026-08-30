@@ -4,19 +4,20 @@ doc-graph: "When there is an intention to amend this document, first Adhere to [
 
 # slq
 
-`slq` is a small command-line tool for querying session logs from Codex and Claude with one language and one `Record` schema.
+`slq` is a small command-line tool for querying session logs from Codex, Claude, and Devin with one language and one `Record` schema. It runs on Linux and macOS.
 
 ## Features
 
 | Feature                          | What it gives you                                                                            |
 | -------------------------------- | --------------------------------------------------------------                               |
-| Single query surface             | Query both Codex and Claude logs with the same FBR expression                                |
+| Single query surface             | Query Codex, Claude, and Devin logs with the same FBR expression                             |
 | Field-bounded regex (FBR)        | `:k/session/`, `:d/2026-08-29/`, `/count/`, `!`, `and`, `or`                                 |
 | Source pushdown                  | Skip files the query proves cannot match                                                     |
 | Lazy cursor                      | Stream records one pass; limit, time range, and stats overlays                               |
 | Context output                   | Grep-style `-C N` context around matching records                                            |
 | Multiple formats                 | `plain`, `json`, and `text` (TTY-aware table) output                                         |
-| Source listing                   | `slq ls`, `slq ls codex`, `slq ls claude`                                                    |
+| Source listing                   | `slq ls`, `slq ls codex`; only stores that exist are listed                                  |
+| POSIX portability                | One code path on Linux and macOS; per-host stores are candidate roots, not host tests        |
 | Parallel listing                 | `WorkQueue` starts 1 worker and spawns more only when chunks exceed 10 ms, up to `nproc - 1` |
 | Polymorphic fields               | `Record` subclasses choose default fields; `record_field` metadata dispatches renderers      |
 | TTY-aware plain output           | `plain` aligns columns on a TTY and stays tab-separated when piped                           |
@@ -73,7 +74,7 @@ slq ls fields
 # List codex session files (timestamp and short hash)
 slq ls codex
 
-# List all sessions from both codex and claude (use `-n N` for large histories)
+# List all sessions from every available source (use `-n N` for large histories)
 slq :kind/session/
 
 # User messages containing "count"
@@ -124,8 +125,8 @@ slq :k/user/ /count/         # implicit
 | Command           | Arguments                 | Purpose                                                    |
 | ----------------- | ------------------------- | ----------------------------------------------------       |
 | `query <fbr>`     | FBR expression            | Run a query                                                |
-| `ls`              |                           | List data sources, default paths, and the record fieldspec |
-| `ls <source>`     | `codex` or `claude`       | List that source's session files (timestamp, short hash)   |
+| `ls`              |                           | List admitted data sources, paths, and record fields       |
+| `ls <source>`     | source name               | List that source's sessions (timestamp, short hash)        |
 | `ls fields`       |                           | List canonical record fields (name and type)               |
 
 ### Global/query flags

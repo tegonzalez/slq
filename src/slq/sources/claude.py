@@ -24,12 +24,9 @@ class ClaudeSource(DataSource):
         return [Path.home() / ".claude" / "projects"]
 
     def records(self, ast: QueryAST, env: Optional[Dict[str, Any]] = None) -> Iterator[Record]:
-        paths = (env or {}).get("paths") or self.default_paths
         sessions_dir = (env or {}).get("sessions_dir") or self._sessions_dir or (Path.home() / ".claude" / "sessions")
         metadata = self._load_metadata(sessions_dir)
-        for base in paths:
-            if not base.exists():
-                continue
+        for base in self.admitted_paths(env):
             for project_dir in sorted(base.iterdir()):
                 if not project_dir.is_dir():
                     continue
@@ -47,14 +44,11 @@ class ClaudeSource(DataSource):
                     yield from self._read_file(file, ast, session_id, project, meta)
 
     def sessions(self, env: Optional[Dict[str, Any]] = None) -> Iterator[Record]:
-        paths = (env or {}).get("paths") or self.default_paths
         sessions_dir = (env or {}).get("sessions_dir") or self._sessions_dir or (Path.home() / ".claude" / "sessions")
         metadata = self._load_metadata(sessions_dir)
         manager = get_resource_manager()
         items: List[Tuple[Path, str, Optional[Dict[str, Any]]]] = []
-        for base in paths:
-            if not base.exists():
-                continue
+        for base in self.admitted_paths(env):
             for project_dir in sorted(base.iterdir()):
                 if not project_dir.is_dir():
                     continue

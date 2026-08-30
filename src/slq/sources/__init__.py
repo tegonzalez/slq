@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 
+from .. import platform
 from ..eval import allows_value
 from ..query import QueryAST
 from ..schema import Record, SourceRecord
@@ -20,16 +21,44 @@ class DataSource(ABC):
     def default_paths(self) -> List[Path]:
         ...
 
-    def can_answer(self, ast: QueryAST) -> bool:
-        return allows_value(ast, "tool", self.name)
+    def _candidate_paths(self, env: Optional[Dict[str, Any]] = None) -> List[Path]:
+        env = env or {}
+        if "paths" in env:
+            return [Path(p) for p in env["paths"]]
+        return list(self.default_paths)
+
+    def can_answer(self, ast: QueryAST, env: Optional[Dict[str, Any]] = None) -> bool:
+        return allows_value(ast, "tool", self.name) and self.available(env)
 
     @abstractmethod
     def records(self, ast: QueryAST, env: Optional[Dict[str, Any]] = None) -> Iterator[Record]:
         ...
 
+    def admits(self, path: Path) -> bool:
+        """Return whether ``path`` satisfies this source's admission predicate.
+
+        The default predicate is plain existence; sources with a store shape
+        override this.
+        """
+        return path.exists()
+
+    def admitted_paths(self, env: Optional[Dict[str, Any]] = None) -> List[Path]:
+        """Return the candidate roots that exist, are admitted, and are distinct."""
+        result: List[Path] = []
+        for path in self._candidate_paths(env):
+            if not self.admits(path):
+                continue
+            if any(platform.same_path(path, seen) for seen in result):
+                continue
+            result.append(path)
+        return result
+
+    def available(self, env: Optional[Dict[str, Any]] = None) -> bool:
+        return bool(self.admitted_paths(env))
+
     def list(self, env: Optional[Dict[str, Any]] = None) -> Iterator[Record]:
         """List source-level rows (tool, default paths) as ``Record`` DTOs."""
-        for path in self.default_paths:
+        for path in self.admitted_paths(env):
             yield SourceRecord(
                 tool=self.name,
                 kind="source",

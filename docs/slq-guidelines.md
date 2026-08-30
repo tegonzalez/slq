@@ -82,6 +82,10 @@ Every `Record` field is declared with `record_field(..., format="...")` and, whe
 
 When a source has a native query layer (SQLite, an index, or another structured backend), translate the `QueryRequest` into the native language and push `tool`, `session_id`, `timestamp`, `kind`, and `content` constraints down to it. Keep the translation localized to the source and test it with deterministic fixtures. This preserves the `DataSource` protocol while avoiding unnecessary data transfer.
 
+### `SLQG-019` Gate a Source on Its Admitted Paths
+
+Resolve a source's candidate roots through one overridable `admits(path)` predicate and deduplicate admitted paths with `platform.same_path()`. Use the admitted set for `available()`, `list()`, `records()`, and `sessions()`. This makes listing and query behavior describe stores that actually exist while preserving every distinct root.
+
 ### `SLQG-020` Keep Process and Path Primitives in `platform`
 
 Keep POSIX process and path primitives in `src/slq/platform.py` as `logical_cwd()`, `same_path(a, b)`, `compatible_python(root)`, and `exec_or_run(argv)`. Call these primitives from commands and sources instead of inspecting the host at each use site. This keeps host-sensitive behavior in one readable module.

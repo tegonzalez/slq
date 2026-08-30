@@ -46,6 +46,9 @@ A missing owner gates only an authority question routed by this index; a nearby 
 | How are field prefixes resolved?     | derived | product specification → architecture design | `resolve_field_prefix`, `VALID_FIELD_NAMES`               | Gate on first missing owner       |
 | How is the output projection chosen? | derived | product specification → architecture design | `extract_output_fields`, display-only `:<field>` terms    | Gate on first missing owner       |
 | How are platform paths compared?     | derived | architecture design → guidelines            | `logical_cwd`, `same_path`, `compatible_python`           | Gate on first missing owner       |
+| Which hosts are supported?           | direct  | product specification                       | POSIX hosts and declarative discovery                     | Report missing spec owner         |
+| When is a source available?          | derived | product specification → architecture design | Admitted paths, listings, query skipping                  | Gate on first missing owner       |
+| Where does a source look for data?   | derived | architecture design → guidelines            | Candidate roots, admission, filesystem deduplication      | Gate on first missing owner       |
 
 ## Durable Boundary
 

@@ -10,19 +10,22 @@ Define the architecture that lets a single `Record` schema, a single query langu
 
 ## Terminology
 
-| Term           | Meaning                                                                                                     |
-| -------------  | ----------------------------------------------------------------------------------------------------------- |
-| `Record`       | Common dataclass produced by every source and consumed by every output                                      |
-| `DataSource`   | Protocol for a source of `Record`s; codex, claude, and devin are initial implementations                    |
-| `platform`     | POSIX process and path primitives kept behind one module                                                    |
-| `FBR`          | Field-bounded regex query language                                                                          |
-| `QueryAST`     | Parsed, validated FBR expression                                                                            |
-| `QueryRequest` | Encapsulated query parameters passed to a source, including the AST and time bounds                         |
-| `SQLBuilder`   | AST-to-SQL translator for database-backed sources                                                           |
-| `Cursor`       | Lazy stream of `Record`s produced by evaluating a query                                                     |
-| `pushdown`     | Source skipping files, rows, or session materialization the AST proves cannot match                         |
-| `present`      | Reusable DTO and TTY text-rendering library (candidate for promotion)                                       |
-| `overlay`      | Resultset transformation such as stats or projection                                                        |
+| Term             | Meaning                                                                                                     |
+| -------------    | ----------------------------------------------------------------------------------------------------------- |
+| `Record`         | Common dataclass produced by every source and consumed by every output                                      |
+| `DataSource`     | Protocol for a source of `Record`s; codex, claude, and devin are initial implementations                    |
+| `candidate root` | Discovery location declared by a source whether or not it exists on this host                               |
+| `admitted path`  | Candidate root that exists, satisfies the source predicate, and is distinct by filesystem identity          |
+| `available`      | A source has at least one admitted path                                                                     |
+| `platform`       | POSIX process and path primitives kept behind one module                                                    |
+| `FBR`            | Field-bounded regex query language                                                                          |
+| `QueryAST`       | Parsed, validated FBR expression                                                                            |
+| `QueryRequest`   | Encapsulated query parameters passed to a source, including the AST and time bounds                         |
+| `SQLBuilder`     | AST-to-SQL translator for database-backed sources                                                           |
+| `Cursor`         | Lazy stream of `Record`s produced by evaluating a query                                                     |
+| `pushdown`       | Source skipping files, rows, or session materialization the AST proves cannot match                         |
+| `present`        | Reusable DTO and TTY text-rendering library (candidate for promotion)                                       |
+| `overlay`        | Resultset transformation such as stats or projection                                                        |
 
 ## Design Goals
 
@@ -114,17 +117,20 @@ The FBR parser resolves a field spec against the canonical `Record` field names 
 
 The `ls` command uses `DataSource.list()` and `DataSource.sessions()` to return source or session `Record`s without a query; `ls` reads only metadata, not full event content. A bare `ls` lists sources through `DataSource.list()` and then appends a `FieldRecord` for each canonical `Record` field, so users can discover both source names and queryable fields. `slq ls fields` emits only the `FieldRecord` field spec. File-backed `DataSource.sessions()` partitions the file list into chunks, submits them to the `WorkQueue` managed by the `ResourceManager`, collects the session `Record`s, and sorts them by `timestamp` ascending before yielding. Database-backed `DataSource.sessions()` issues its own metadata query and yields the resulting `Record`s in a stable order.
 
+Before either listing or query execution, a source resolves its admitted paths: it filters the candidate roots from `default_paths` through one source-owned `admits(path)` predicate, then deduplicates them with `platform.same_path()`. `available()` is true when at least one path remains, `list()` emits one row per admitted path, and `can_answer()` is false when none remain. Each source iterates every admitted path in `records()` and `sessions()` rather than selecting the first existing root.
+
 `Record` is a base dataclass. `SourceRecord`, `SessionRecord`, and `FieldRecord` are subclasses that set a polymorphic `default_fields` for their respective listing contexts. Each field is declared with `record_field(..., format="...")`; `record_value()` dispatches to a single renderer per field type (`datetime`, `hash`, `short-hash`, `path`, `text`, `number`). `evaluate` records the first match offset for each matched field in `record.meta["hint"]`, and the output layer uses it to start `content` truncation at the match so the matched text appears at position 0.
 
 `output.render_records` and the `present` library format the resulting `Record` stream as `plain`, `json`, or `text`. `plain` is tab-separated when the output is not a TTY and is a TTY-aware aligned table (without headers) when it is. On a TTY `plain` is streamed by default: records are emitted as they are produced and column widths may increase as wider records arrive. `-w`/`--width` opts out of streaming and pre-calculates column widths from the full result set; `-s`/`--stream` opts into streaming.
 
 ## Source-Specific Mapping
 
-All sources implement `DataSource.can_answer(ast)`, `DataSource.records(ast, env)`, `DataSource.list(env)`, and `DataSource.sessions(env)`. File-backed sources use the shared `ResourceManager` to open each JSONL once and avoid re-reading unchanged files; database-backed sources manage their own connection and use source-specific pushdown to avoid fetching rows the AST proves cannot match. `list()` returns source-level `Record`s (tool and default paths). `sessions()` returns one `Record` per session with session-level metadata such as `record_count`, `duration`, and `model`.
+All sources implement `DataSource.can_answer(ast)`, `DataSource.records(ast, env)`, `DataSource.list(env)`, and `DataSource.sessions(env)`. File-backed sources use the shared `ResourceManager` to open each JSONL once and avoid re-reading unchanged files; database-backed sources manage their own connection and use source-specific pushdown to avoid fetching rows the AST proves cannot match. `list()` returns one source-level `Record` per admitted path. `sessions()` returns one `Record` per session across every admitted path.
 
 ### Codex
 
-- Default search path: `~/.codex/sessions/YYYY/MM/DD/rollout-<session-id>.jsonl`.
+- Candidate root: `~/.codex/sessions`; the source admits it only when it contains a `*.jsonl` file at some depth.
+- Search path within the root: `YYYY/MM/DD/rollout-<session-id>.jsonl`.
 - Session index, if present at `~/.codex/session_index.jsonl`, maps `session_id` and `updated_at` to the rollout file.
 - JSONL records typically contain `role`, `content`, `id`, and `created_at`. Map:
   - `tool` = `codex`
@@ -140,7 +146,7 @@ All sources implement `DataSource.can_answer(ast)`, `DataSource.records(ast, env
 
 ### Claude
 
-- Default search path: `~/.claude/projects/<project>/<session-id>.jsonl`.
+- Candidate root: `~/.claude/projects`; every admitted root is scanned for `<project>/<session-id>.jsonl`.
 - Session metadata at `~/.claude/sessions/<session-id>.json` gives `startedAt` and `cwd`.
 - JSONL records contain `type` (e.g. `user_message`, `assistant_message`, `thinking`), `message`/`content`, and a timestamp. Map:
   - `tool` = `claude`
@@ -158,7 +164,8 @@ All sources implement `DataSource.can_answer(ast)`, `DataSource.records(ast, env
 
 ### Devin
 
-- Default source path: `~/.local-rw/share/devin/cli/sessions.db` (fallback to `~/.devin/sessions.db` or a user-supplied path via `env["paths"]`).
+- Candidate roots: `~/.devin/sessions.db`, `~/.local-rw/share/devin/cli/sessions.db`, and `~/.local/share/devin/cli/sessions.db`; `env["paths"]` replaces this list.
+- Admission predicate: the candidate is an existing file; every admitted database is queried.
 - One SQLite database holds `message_nodes` rows keyed by `session_id` and `node_id`. Each `chat_message` blob is a JSON object.
 - The source builds a `QueryRequest` from the FBR AST, `since`/`until` bounds, and source environment. `SQLBuilder` translates the AST into a parameterized SQLite `WHERE` clause; `kind`, `content` regex, `timestamp`, and `session_id` filters run in the database.
 - Map:
@@ -176,7 +183,7 @@ All sources implement `DataSource.can_answer(ast)`, `DataSource.records(ast, env
 - Session row: `kind='session'`, `record_id=session_id`, `content` = concatenated event content (or summary when the query excludes `kind=session`), `record_count` and `duration` from first/last event and the `message_nodes` row count.
 - The short hash is computed from the session slug, hyphen-bounded, and 12-16 characters long so it is visually distinct from the 8-character codex/claude UUID prefixes.
 
-Inspect the actual files under `~/.codex`, `~/.claude`, and `~/.local-rw/share/devin/cli/` to confirm field names; the structure may vary by tool version.
+Inspect the actual files under `~/.codex`, `~/.claude`, `~/.devin`, and the Devin CLI share directories to confirm field names; the structure may vary by tool version.
 
 ### Seam Inventory
 
@@ -339,6 +346,17 @@ Inspect the actual files under `~/.codex`, `~/.claude`, and `~/.local-rw/share/d
 | Rejection reason  | scattered branches hide platform behavior; binary magic identifies a container format rather than a runnable ABI; `pyvenv.cfg` may name a path valid on both hosts; an unpublished package would block this repository                                                                                                                                                                                                                                                                                                                                                              |
 | Affected surfaces | `src/slq/platform.py`, command modules, and source discovery                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Status            | current                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+
+### `SLQD-17` Admitted Paths Decide Source Availability
+
+| Field             | Value                                                                                                                                                                                                                     |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Decision          | A source resolves candidate roots to admitted paths; `list()` emits one row per admitted path and `can_answer()` is false when none are admitted                                                                          |
+| Rationale         | Listings must identify stores that exist, queries must skip stores absent from a host, and every real store must be scanned                                                                                               |
+| Alternatives      | List every declared path; select only the first existing root; add per-source path flags                                                                                                                                  |
+| Rejection reason  | Unconditional listing advertises missing stores; first-existing selection drops data; path flags move source layout into the CLI                                                                                          |
+| Affected surfaces | `DataSource`, Codex, Claude, Devin, `slq ls`, and query dispatch                                                                                                                                                          |
+| Status            | current                                                                                                                                                                                                                   |
 
 ### `SLQD-11` On-Demand File Access
 

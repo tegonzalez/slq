@@ -226,6 +226,10 @@ def _run_ls(args: argparse.Namespace, out: TextIO, err: TextIO) -> int:
         if source is None:
             err.write(f"slq: unknown source: {args.source}\n")
             return 2
+        if not source.available():
+            roots = ", ".join(str(p) for p in source.default_paths)
+            err.write(f"slq: {source.name} not available: {roots}\n")
+            return 0
         records = source.sessions()
         fields = _parse_fields(args.fields) if args.fields else None
         render_records(records, args.format, fields=fields, out=out, precompute_widths=args.precompute_widths)

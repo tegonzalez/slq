@@ -9,6 +9,13 @@ from ..schema import Record, SessionRecord, normalize_kind
 from . import DataSource, _extract_text, _extract_uuid, _file_mtime, _model_from, _parse_timestamp, _session_sort_key
 
 
+def _has_jsonl(path: Path) -> bool:
+    try:
+        return any(path.rglob("*.jsonl"))
+    except (OSError, PermissionError):
+        return False
+
+
 class CodexSource(DataSource):
     name = "codex"
 
@@ -19,23 +26,22 @@ class CodexSource(DataSource):
     def default_paths(self) -> List[Path]:
         if self._paths:
             return self._paths
-        return [Path.home() / ".codex" / "sessions"]
+        return [
+            Path.home() / ".codex" / "sessions",
+        ]
+
+    def admits(self, path: Path) -> bool:
+        return path.is_dir() and _has_jsonl(path)
 
     def records(self, ast: QueryAST, env: Optional[Dict[str, Any]] = None) -> Iterator[Record]:
-        paths = (env or {}).get("paths") or self.default_paths
-        for base in paths:
-            if not base.exists():
-                continue
+        for base in self.admitted_paths(env):
             for file in sorted(base.rglob("*.jsonl")):
                 yield from self._read_file(file, ast)
 
     def sessions(self, env: Optional[Dict[str, Any]] = None) -> Iterator[Record]:
-        paths = (env or {}).get("paths") or self.default_paths
         manager = get_resource_manager()
         files: List[Path] = []
-        for base in paths:
-            if not base.exists():
-                continue
+        for base in self.admitted_paths(env):
             files.extend(sorted(base.rglob("*.jsonl")))
         workers = manager.queue.max_workers
         chunk_size = max(1, (len(files) + workers - 1) // workers)
