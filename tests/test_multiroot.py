@@ -131,3 +131,88 @@ def test_claude_uses_admitted_paths(tmp_path: Path) -> None:
     records = list(source.records(parse(":kind/user/")))
     assert len(records) == 1
     assert records[0].project == "proj"
+
+
+def test_claude_default_roots_discovers_ccs_instances_and_dedupes(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    home = tmp_path / "home"
+    default_projects = home / ".claude" / "projects"
+    default_projects.mkdir(parents=True)
+
+    ccs_dir = tmp_path / "ccs"
+    fh_projects = ccs_dir / "instances" / "forhumanity" / "projects"
+    personal_projects = ccs_dir / "instances" / "personal" / "projects"
+    hidden_projects = ccs_dir / "instances" / ".claude" / "projects"
+    fh_projects.mkdir(parents=True)
+    personal_projects.mkdir(parents=True)
+    hidden_projects.mkdir(parents=True)
+
+    # SymlinkCLAUDE_CONFIG_DIR to forhumanity to verify inode deduplication
+    cfg_link = tmp_path / "active-instance"
+    cfg_link.symlink_to(ccs_dir / "instances" / "forhumanity")
+
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(cfg_link))
+    monkeypatch.setenv("CCS_DIR", str(ccs_dir))
+
+    source = ClaudeSource()
+    admitted = source.admitted_paths()
+    assert len(admitted) == 3
+    profiles = [r.profile for r in source.list()]
+    assert profiles == ["forhumanity", "default", "personal"]
+
+
+def test_claude_default_roots_fall_back_to_home_ccs_instances(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    home = tmp_path / "home"
+    (home / ".claude" / "projects").mkdir(parents=True)
+    (home / ".ccs" / "instances" / "work" / "projects").mkdir(parents=True)
+
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.delenv("CLAUDE_CONFIG_DIR", raising=False)
+    monkeypatch.delenv("CCS_DIR", raising=False)
+
+    profiles = [r.profile for r in ClaudeSource().list()]
+    assert profiles == ["default", "work"]
+
+
+def test_claude_per_instance_sessions_sidecar_and_profile_pushdown(tmp_path: Path) -> None:
+    default_root = tmp_path / ".claude"
+    (default_root / "projects" / "p1").mkdir(parents=True)
+    (default_root / "sessions").mkdir(parents=True)
+    (default_root / "projects" / "p1" / "s1.jsonl").write_text(
+        '{"message": {"role": "user", "content": "from default", "timestamp": "2026-08-29T12:00:00Z"}}\n'
+    )
+    (default_root / "sessions" / "101.json").write_text(
+        '{"sessionId": "s1", "cwd": "/work/default", "startedAt": 1788004800000}\n'
+    )
+
+    fh_root = tmp_path / "instances" / "forhumanity"
+    (fh_root / "projects" / "p2").mkdir(parents=True)
+    (fh_root / "sessions").mkdir(parents=True)
+    (fh_root / "projects" / "p2" / "s2.jsonl").write_text(
+        '{"message": {"role": "user", "content": "from fh", "timestamp": "2026-08-29T13:00:00Z"}}\n'
+    )
+    (fh_root / "sessions" / "202.json").write_text(
+        '{"sessionId": "s2", "cwd": "/work/fh", "startedAt": 1788008400000}\n'
+    )
+
+    source = ClaudeSource([default_root / "projects", fh_root / "projects"])
+
+    all_sessions = {s.session_id: s for s in source.sessions()}
+    assert set(all_sessions.keys()) == {"s1", "s2"}
+    assert all_sessions["s1"].profile == "default"
+    assert all_sessions["s1"].cwd == "/work/default"
+    assert all_sessions["s2"].profile == "forhumanity"
+    assert all_sessions["s2"].cwd == "/work/fh"
+
+    # Root-level pushdown on :profile/forhumanity/ skips default root completely
+    fh_records = list(source.records(parse(":profile/forhumanity/ :kind/user/")))
+    assert len(fh_records) == 1
+    assert fh_records[0].session_id == "s2"
+    assert fh_records[0].profile == "forhumanity"
+    assert fh_records[0].cwd == "/work/fh"

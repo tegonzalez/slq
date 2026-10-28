@@ -59,7 +59,7 @@ Every source and every output record uses:
 - `tool`, `session_id`, `record_id`, `parent_id`, `short_hash` (computed)
 - `timestamp`, `end_timestamp`
 - `kind`, `role`, `rec_type`, `subtype`
-- `content`, `path`, `cwd`, `project`, `model`
+- `content`, `path`, `cwd`, `profile`, `project`, `model`
 - `record_count`, `duration` (session rows)
 - `meta`, `raw`
 
