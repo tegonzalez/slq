@@ -97,3 +97,31 @@ def test_claude_sessions_sorted():
     sessions = list(source.sessions(env))
     assert len(sessions) == 1
     assert sessions[0].timestamp is not None
+
+
+def test_claude_session_cwd_and_model_fallback_without_sidecar(tmp_path: Path) -> None:
+    inst_root = tmp_path / "instances" / "personal"
+    proj_dir = inst_root / "projects" / "myproj"
+    proj_dir.mkdir(parents=True)
+    session_file = proj_dir / "sess-fallback.jsonl"
+    session_file.write_text(
+        '{"type": "last-prompt", "lastPrompt": "hi"}\n'
+        '{"type": "user", "cwd": "/work/personal-app", "timestamp": "2026-08-29T12:00:00Z", '
+        '"message": {"role": "user", "model": "claude-opus-4-7", "content": "hello"}}\n'
+    )
+
+    source = ClaudeSource([inst_root / "projects"])
+
+    ls_sessions = list(source.sessions())
+    assert len(ls_sessions) == 1
+    assert ls_sessions[0].session_id == "sess-fallback"
+    assert ls_sessions[0].profile == "personal"
+    assert ls_sessions[0].cwd == "/work/personal-app"
+    assert ls_sessions[0].model == "claude-opus-4-7"
+
+    query_sessions = [r for r in source.records(parse(":kind/session/")) if r.kind == "session"]
+    assert len(query_sessions) == 1
+    assert query_sessions[0].session_id == "sess-fallback"
+    assert query_sessions[0].profile == "personal"
+    assert query_sessions[0].cwd == "/work/personal-app"
+    assert query_sessions[0].model == "claude-opus-4-7"

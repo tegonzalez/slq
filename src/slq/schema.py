@@ -46,6 +46,7 @@ class Record:
     content: Optional[str] = record_field(format="text", default=None)
     path: Optional[str] = record_field(format="path", default=None)
     cwd: Optional[str] = record_field(format="path", default=None)
+    profile: Optional[str] = record_field(format="text", default=None)
     project: Optional[str] = record_field(format="text", default=None)
     model: Optional[str] = record_field(format="text", default=None)
     record_count: Optional[int] = record_field(format="number", default=None)
